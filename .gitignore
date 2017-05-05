@@ -1,2 +1,7 @@
 bin
 psi
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+*.csv

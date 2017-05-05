@@ -3,13 +3,13 @@ OBJ_FILES := $(patsubst src/%.cpp,bin/%.o,$(CPP_FILES))
 CPP_FILES += lib/libmrio/src/MRIOIndexSet.cpp lib/libmrio/src/MRIOTable.cpp
 OBJ_FILES += bin/MRIOIndexSet.o bin/MRIOTable.o
 .SECONDARY: OBJ_FILES
-LD_FLAGS := -Wl,--gc-sections -lnetcdf_c++4
-CC_FLAGS := -std=c++0x -I lib/cpp-library -I lib/libmrio/include -fdata-sections -ffunction-sections -Wshadow
+LD_FLAGS := -lnetcdf_c++4 -lnetcdf
+CC_FLAGS := -std=c++11 -I lib/cpp-library -I lib/libmrio/include -Wshadow
 
 all: fast
 
-fast: CC_FLAGS += -fopenmp -O3
-fast: LD_FLAGS += -fopenmp
+fast: CC_FLAGS += -fopenmp -flto -O3
+fast: LD_FLAGS += -fopenmp -flto
 fast: gcc
 
 debug: CC_FLAGS += -g -DDEBUG
