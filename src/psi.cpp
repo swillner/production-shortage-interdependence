@@ -34,7 +34,7 @@ static char doc[] =
  Described in:\n\
     N. Glanemann, S.N. Willner, L. Wenz, R. Bierkandt, A. Levermann:\
  Abrupt Events and the Global Supply Network: A Network Measure for Cascading Production Losses.\
- TODO (2016). DOI: TODO\n\n\
+ \n\n                                                                   \
 Source: https://github.com/swillner/production-shortage-interdependence";
 static char args_doc[] = "DATAFILE [INDEXFILE] OUTPUTFILE";
 static struct argp_option options[] = {{"threshold", 't', "THRESHOLD", 0, "Only read values > THRESHOLD from table (default: 0)"},
