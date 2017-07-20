@@ -1,0 +1,23 @@
+{
+    "description": "Production Shortage Interdependence measure (PSI) in multi-regional input-output tables / trade networks.",
+    "license": {
+        "id": "AGPL-3.0"
+    },
+    "title": "production-shortage-interdependence v1.0.0",
+    "upload_type": "software",
+    "creators": [
+        {
+            "name": "Sven Willner",
+            "affiliation": "Potsdam Institute for Climate Impact Research",
+            "orcid": "0000-0001-6798-6247"
+        }
+    ],
+    "access_right": "open",
+    "related_identifiers": [
+        {
+            "scheme": "url",
+            "identifier": "https://github.com/swillner/production-shortage-interdependence/tree/v1.0.0",
+            "relation": "isSupplementTo"
+        }
+    ]
+}
