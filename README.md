@@ -1,3 +1,6 @@
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.832462-blue.svg)](http://dx.doi.org/10.5281/zenodo.832462)
+
+
 # Production Shortage Interdependence Measure
 
 C++-Implementation of the production shortage interdependence measure (PSI) as described in:
