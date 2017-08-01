@@ -4,7 +4,7 @@ CPP_FILES += lib/libmrio/src/MRIOIndexSet.cpp lib/libmrio/src/MRIOTable.cpp
 OBJ_FILES += bin/MRIOIndexSet.o bin/MRIOTable.o
 .SECONDARY: OBJ_FILES
 LD_FLAGS := -lnetcdf_c++4 -lnetcdf
-CC_FLAGS := -std=c++11 -I lib/cpp-library -I lib/libmrio/include -Wshadow
+CC_FLAGS := -std=c++11 -I lib/cpp-library -I lib/libmrio/include -Wshadow -DLIBMRIO_NETCDF
 
 all: fast
 

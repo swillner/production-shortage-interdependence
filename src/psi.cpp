@@ -24,8 +24,8 @@
 #include <iostream>
 #include <string>
 
-typedef unsigned int I;  // Index type
-typedef float T;         // Data type
+using I = size_t;  // Index type
+using T = double;  // Data type
 
 const char* argp_program_bug_address = "<sven.willner@pik-potsdam.de>";
 const char* argp_program_version = "1.0.0";
@@ -140,9 +140,12 @@ int main(int argc, char* argv[]) {
         arguments.files[2] = 0;
         argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
+#ifdef LIBMRIO_NETCDF
         if (ends_with(arguments.files[0], ".nc")) {
             table.read_from_netcdf(arguments.files[0], arguments.threshold);
-        } else if (ends_with(arguments.files[0], ".mrio")) {
+        } else
+#endif
+            if (ends_with(arguments.files[0], ".mrio")) {
             std::ifstream flows_file(arguments.files[0], std::ios::in | std::ios::binary);
             if (!flows_file) {
                 std::cerr << "Could not open flows file '" << arguments.files[0] << "'";
