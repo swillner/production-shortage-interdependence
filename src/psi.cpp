@@ -15,27 +15,28 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <MRIOTable.h>
 #include <argp.h>
-#include <nvector.h>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include "MRIOTable.h"
+#include "nvector.h"
 
 using I = size_t;  // Index type
 using T = double;  // Data type
 
 const char* argp_program_bug_address = "<sven.willner@pik-potsdam.de>";
-const char* argp_program_version = "1.0.0";
+const char* argp_program_version = PSI_VERSION;
 static char doc[] =
-    "Production Shortage Interdependence measure (PSI).\n\
- Described in:\n\
-    N. Glanemann, S.N. Willner, L. Wenz, R. Bierkandt, A. Levermann:\
- Abrupt Events and the Global Supply Network: A Network Measure for Cascading Production Losses.\
- \n\n                                                                   \
-Source: https://github.com/swillner/production-shortage-interdependence";
+    "Production Shortage Interdependence measure (PSI).\n"
+    "Described in:\n"
+    "  N. Glanemann, S.N. Willner, L. Wenz, R. Bierkandt, A. Levermann.\n"
+    "  Abrupt Events and the Global Supply Network:\n"
+    "    A Network Measure for Cascading Production Losses.\n"
+    "\n"
+    "Source: https://github.com/swillner/production-shortage-interdependence";
 static char args_doc[] = "DATAFILE [INDEXFILE] OUTPUTFILE";
 static struct argp_option options[] = {{"threshold", 't', "THRESHOLD", 0, "Only read values > THRESHOLD from table (default: 0)"},
                                        {"gamma", 'g', "GAMMA", 0, "Substitutability 'gamma' (default: 0)"},
