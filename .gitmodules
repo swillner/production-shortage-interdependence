@@ -1,6 +1,0 @@
-[submodule "lib/cpp-library"]
-	path = lib/cpp-library
-	url = https://github.com/swillner/cpp-library.git
-[submodule "lib/libmrio"]
-	path = lib/libmrio
-	url = https://github.com/swillner/libmrio.git
