@@ -87,7 +87,7 @@ class Parser {
         Parser& p;
 
       protected:
-        Row(Parser& parser) : p(parser){};
+        explicit Row(Parser& parser) : p(parser){};
 
       public:
         class iterator;
@@ -99,13 +99,13 @@ class Parser {
             Parser& p;
 
           protected:
-            Col(Parser& parser) : p(parser){};
+            explicit Col(Parser& parser) : p(parser){};
 
           public:
             template<typename T>
             inline T read() {
                 return p.read<T>();
-            };
+            }
         };
 
         class iterator {
@@ -201,7 +201,7 @@ class Parser {
         T&& tmp = read<T>();
         next_col();
         return tmp;
-    };
+    }
 
     template<typename T1, typename T2, typename... Ts>
     inline std::tuple<T1, T2, Ts...> read() {
@@ -211,7 +211,7 @@ class Parser {
         --col_;
         col_has_been_read = true;
         return res;
-    };
+    }
 
     inline bool next_col();
 
@@ -272,7 +272,6 @@ template<>
 inline void Parser::read<void>() {
     begin_read();
     bool quoted = false;
-    char c;
     while (true) {
         if (in.eof()) {
             if (quoted) {
@@ -281,7 +280,7 @@ inline void Parser::read<void>() {
             row_finished = true;
             break;
         }
-        c = in.get();
+        const char c = in.get();
         if (c == delimiter && !quoted) {
             break;
         } else if (c == '"') {
@@ -302,7 +301,6 @@ inline std::string Parser::read<std::string>() {
     begin_read();
     std::string res = "";
     bool quoted = false;
-    char c;
     while (true) {
         if (in.eof()) {
             if (quoted) {
@@ -311,7 +309,7 @@ inline std::string Parser::read<std::string>() {
             row_finished = true;
             break;
         }
-        c = in.get();
+        const char c = in.get();
         if (c == delimiter && !quoted) {
             break;
         } else if (c == '"') {
@@ -736,6 +734,6 @@ inline Parser& operator>>(Parser& p, T& obj) {
     obj = p.read<T>();
     return p;
 }
-}
+}  // namespace csv
 
 #endif
