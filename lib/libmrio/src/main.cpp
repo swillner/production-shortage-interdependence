@@ -17,17 +17,19 @@
   along with libmrio.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <Disaggregation.h>
-#include <MRIOTable.h>
-#include <settingsnode.h>
-#include <cstdlib>
-#include <fstream>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <stdexcept>
+#include <string>
+#include "Disaggregation.h"
+#include "MRIOTable.h"
+#include "settingsnode.h"
+#include "version.h"
 
 // Define types used in templates
-using I = size_t;  // Index type
-using T = double;  // Data type
+using I = std::size_t;  // Index type
+using T = double;       // Data type
 
 static void print_usage(const char* program_name) {
     std::cerr << "Regional and sectoral disaggregation of multi-regional input-output tables\n"
@@ -83,7 +85,7 @@ int main(int argc, char* argv[]) {
             {
                 const std::string& type = settings["basetable"]["type"].as<std::string>();
                 const std::string& filename = settings["basetable"]["file"].as<std::string>();
-                const T threshold = settings["basetable"]["threshold"].as<T>();
+                const auto threshold = settings["basetable"]["threshold"].as<T>();
                 if (type == "csv") {
                     std::ifstream indices(settings["basetable"]["index"].as<std::string>());
                     if (!indices) {
