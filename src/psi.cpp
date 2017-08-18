@@ -17,19 +17,21 @@
 
 #include <argp.h>
 #include <cstdlib>
+#include <deque>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
 #include "MRIOTable.h"
 #include "nvector.h"
+#include "version.h"
 
 using I = size_t;  // Index type
 using T = double;  // Data type
 
 const char* argp_program_bug_address = "<sven.willner@pik-potsdam.de>";
 const char* argp_program_version = PSI_VERSION;
-static char doc[] =
+static const char* doc =
     "Production Shortage Interdependence measure (PSI).\n"
     "Described in:\n"
     "  N. Glanemann, S.N. Willner, L. Wenz, R. Bierkandt, A. Levermann.\n"
@@ -37,17 +39,17 @@ static char doc[] =
     "    A Network Measure for Cascading Production Losses.\n"
     "\n"
     "Source: https://github.com/swillner/production-shortage-interdependence";
-static char args_doc[] = "DATAFILE [INDEXFILE] OUTPUTFILE";
-static struct argp_option options[] = {{"threshold", 't', "THRESHOLD", 0, "Only read values > THRESHOLD from table (default: 0)"},
-                                       {"gamma", 'g', "GAMMA", 0, "Substitutability 'gamma' (default: 0)"},
-                                       {"max", 'm', "MAX_PSI", 0, "Maximal PSI level to calculate (default: 10)"},
-                                       {"output-type", 'o', "OUTPUTTYPE", 0, "What to output (values: full from to per_region regions, default: full)"},
-                                       {"exclude-self-supply", 's', 0, 0, "Do not consider self-supply"},
-                                       {0}};
+static const char* args_doc = "DATAFILE [INDEXFILE] OUTPUTFILE";
+static struct argp_option options[] = {{"threshold", 't', "THRESHOLD", 0, "Only read values > THRESHOLD from table (default: 0)", 0},
+                                       {"gamma", 'g', "GAMMA", 0, "Substitutability 'gamma' (default: 0)", 0},
+                                       {"max", 'm', "MAX_PSI", 0, "Maximal PSI level to calculate (default: 10)", 0},
+                                       {"output-type", 'o', "OUTPUTTYPE", 0, "What to output (values: full from to per_region regions, default: full)", 0},
+                                       {"exclude-self-supply", 's', nullptr, 0, "Do not consider self-supply", 0},
+                                       {nullptr, 0, nullptr, 0, nullptr, 0}};
 
 enum class OutputType { FULL, FROM, TO, PER_REGION, REGIONS };
 
-struct arguments {
+struct Arguments {
     T threshold;
     T gamma;
     I max_psi;
@@ -57,7 +59,7 @@ struct arguments {
 };
 
 static error_t parse_opt(int key, char* arg, struct argp_state* state) {
-    struct arguments* args = static_cast<arguments*>(state->input);
+    auto* args = static_cast<Arguments*>(state->input);
     switch (key) {
         case 't':
             args->threshold = std::stof(arg);
@@ -131,15 +133,16 @@ int main(int argc, char* argv[]) {
 #ifndef DEBUG
     try {
 #endif
-        struct arguments arguments;
-        struct argp argp = {options, parse_opt, args_doc, doc};
-        arguments.threshold = 1000;
-        arguments.gamma = 0;
-        arguments.max_psi = 11;
-        arguments.output_type = OutputType::FULL;
-        arguments.self_supply = true;
-        arguments.files[2] = 0;
-        argp_parse(&argp, argc, argv, 0, 0, &arguments);
+        struct argp argp = {options, parse_opt, args_doc, doc, nullptr, nullptr, nullptr};
+        struct Arguments arguments = {
+            1000,              // threshold
+            0,                 // gamma
+            11,                // max_psi
+            OutputType::FULL,  // output_type
+            true,              // self_supply
+            nullptr            // files[2]
+        };
+        argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
 
 #ifdef LIBMRIO_NETCDF
         if (ends_with(arguments.files[0], ".nc")) {
@@ -155,7 +158,7 @@ int main(int argc, char* argv[]) {
             table.read_from_mrio(flows_file, arguments.threshold);
             flows_file.close();
         } else if (ends_with(arguments.files[0], ".csv")) {
-            if (!arguments.files[2]) {
+            if (arguments.files[2] == nullptr) {
                 std::cerr << "Missing index file" << std::endl;
                 return -1;
             }
@@ -187,8 +190,8 @@ int main(int argc, char* argv[]) {
         nvector<T, 2> in_flow_by_sector(0, sectors_size, network_size);
         nvector<T, 1> region_output(0, regions_size);
         nvector<T, 3> psi(0, arguments.max_psi, network_size, network_size);
-        nvector<unsigned char, 3> paths_traversed_ir_to_(false, network_size, sectors_size, network_size);
-        nvector<unsigned char, 3> next_paths_traversed_ir_to_(false, network_size, sectors_size, network_size);
+        nvector<bool, 3, std::deque<bool>> paths_traversed_ir_to(false, network_size, sectors_size, network_size);
+        nvector<bool, 3, std::deque<bool>> next_paths_traversed_ir_to(false, network_size, sectors_size, network_size);
 
         for (I ir = 0; ir < network_size; ir++) {
             I i = get_sector(ir);
@@ -220,8 +223,8 @@ int main(int argc, char* argv[]) {
         nvector<I, 1> last_max_k(0, network_size);
         for (I ir = 0; ir < network_size; ir++) {
             if (ir > 0) {
-                paths_traversed_ir_to_.reset(false);
-                next_paths_traversed_ir_to_.reset(false);
+                paths_traversed_ir_to.reset(false);
+                next_paths_traversed_ir_to.reset(false);
             }
             for (I js = 0; js < network_size; js++) {
                 last_max_k(js) = get_sector(js);
@@ -239,7 +242,7 @@ int main(int argc, char* argv[]) {
                                 for (I u = 0; u < regions_size; u++) {
                                     I ku = get_index(k, u);
                                     if (ku != js) {
-                                        if (!paths_traversed_ir_to_(ku, k, js) || ku == ir) {
+                                        if (!paths_traversed_ir_to(ku, k, js) || ku == ir) {
                                             new_psi += psi(level - 1, ir, ku) * psi(1, ku, js) * (1 - arguments.gamma);
                                         }
                                     }
@@ -250,14 +253,14 @@ int main(int argc, char* argv[]) {
                                 }
                             }
                             if (level < arguments.max_psi - 1) {
-                                next_paths_traversed_ir_to_(js, max_k, js) = true;
+                                next_paths_traversed_ir_to(js, max_k, js) = true;
                                 for (I u = 0; u < regions_size; u++) {
                                     I ku = get_index(max_k, u);
-                                    if (psi(level - 1, ir, ku) > 0 && psi(1, ku, js) > 0 && !paths_traversed_ir_to_(ku, max_k, js)) {
+                                    if (psi(level - 1, ir, ku) > 0 && psi(1, ku, js) > 0 && !paths_traversed_ir_to(ku, max_k, js)) {
                                         for (I l = 0; l < sectors_size; l++) {
                                             for (I mv = 0; mv < network_size; mv++) {
-                                                next_paths_traversed_ir_to_(js, l, mv) =
-                                                    next_paths_traversed_ir_to_(js, l, mv) || paths_traversed_ir_to_(ku, l, mv);
+                                                next_paths_traversed_ir_to(js, l, mv) =
+                                                    next_paths_traversed_ir_to(js, l, mv) || paths_traversed_ir_to(ku, l, mv);
                                             }
                                         }
                                     }
@@ -268,14 +271,14 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 if (level < arguments.max_psi - 1) {
-                    std::swap(paths_traversed_ir_to_, next_paths_traversed_ir_to_);
-                    next_paths_traversed_ir_to_.reset(false);
+                    std::swap(paths_traversed_ir_to, next_paths_traversed_ir_to);
+                    next_paths_traversed_ir_to.reset(false);
                 }
             }
         }
 
         char* outfile;
-        if (arguments.files[2]) {
+        if (arguments.files[2] != nullptr) {
             outfile = arguments.files[2];
         } else {
             outfile = arguments.files[1];
@@ -317,7 +320,7 @@ int main(int argc, char* argv[]) {
                     for (I s = 0; s < regions_size; s++) {
                         csv_file << table.index_set().superregions()[r]->name << ',';
                         csv_file << table.index_set().superregions()[s]->name << ',';
-                        for (int level = 1; level < arguments.max_psi; level++) {
+                        for (I level = 1; level < arguments.max_psi; level++) {
                             csv_file << psi_from_region_to_region(level - 1, r, s) << ','
                                      << table.index_set().supersectors()[max_sector(level - 1, r, s)]->name;
                             if (level < arguments.max_psi - 1) {
@@ -336,7 +339,7 @@ int main(int argc, char* argv[]) {
                         csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
                         csv_file << table.index_set().supersectors()[get_sector(js)]->name << ',';
                         csv_file << table.index_set().superregions()[get_region(js)]->name << ',';
-                        for (int level = 1; level < arguments.max_psi; level++) {
+                        for (I level = 1; level < arguments.max_psi; level++) {
                             csv_file << psi(level, ir, js);
                             if (level < arguments.max_psi - 1) {
                                 csv_file << ',';
@@ -370,7 +373,7 @@ int main(int argc, char* argv[]) {
                         csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
                         csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
                         csv_file << table.index_set().superregions()[s]->name << ',';
-                        for (int level = 1; level < arguments.max_psi; level++) {
+                        for (I level = 1; level < arguments.max_psi; level++) {
                             csv_file << psi_from_sector_to_region(level, ir, s);
                             if (level < arguments.max_psi - 1) {
                                 csv_file << ',';
@@ -399,7 +402,7 @@ int main(int argc, char* argv[]) {
                 for (I ir = 0; ir < network_size; ir++) {
                     csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
                     csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
-                    for (int level = 1; level < arguments.max_psi; level++) {
+                    for (I level = 1; level < arguments.max_psi; level++) {
                         csv_file << psi_from(level, ir);
                         if (level < arguments.max_psi - 1) {
                             csv_file << ',';
@@ -427,7 +430,7 @@ int main(int argc, char* argv[]) {
                 for (I ir = 0; ir < network_size; ir++) {
                     csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
                     csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
-                    for (int level = 1; level < arguments.max_psi; level++) {
+                    for (I level = 1; level < arguments.max_psi; level++) {
                         csv_file << psi_to(level, ir);
                         if (level < arguments.max_psi - 1) {
                             csv_file << ',';
