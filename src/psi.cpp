@@ -149,15 +149,7 @@ int main(int argc, char* argv[]) {
             table.read_from_netcdf(arguments.files[0], arguments.threshold);
         } else
 #endif
-            if (ends_with(arguments.files[0], ".mrio")) {
-            std::ifstream flows_file(arguments.files[0], std::ios::in | std::ios::binary);
-            if (!flows_file) {
-                std::cerr << "Could not open flows file '" << arguments.files[0] << "'";
-                return -1;
-            }
-            table.read_from_mrio(flows_file, arguments.threshold);
-            flows_file.close();
-        } else if (ends_with(arguments.files[0], ".csv")) {
+            if (ends_with(arguments.files[0], ".csv")) {
             if (arguments.files[2] == nullptr) {
                 std::cerr << "Missing index file" << std::endl;
                 return -1;
