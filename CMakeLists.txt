@@ -24,18 +24,6 @@ if(PSI_PARALLELIZATION)
   set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
 endif()
 
-#include NetCDF C library
-find_package(NETCDF REQUIRED)
-message(STATUS "NetCDF include directory: ${NETCDF_INCLUDE_DIR}")
-message(STATUS "NetCDF library: ${NETCDF_LIBRARY}")
-target_link_libraries(psi netcdf)
-
-#include NetCDF C++ library
-find_package(NETCDF_CPP4 REQUIRED)
-message(STATUS "NetCDF_c++4 include directory: ${NETCDF_CPP4_INCLUDE_DIR}")
-message(STATUS "NetCDF_c++4 library: ${NETCDF_CPP4_LIBRARY}")
-target_link_libraries(psi netcdf_c++4)
-
 include(lib/libmrio/libmrio.cmake)
 target_link_libraries(psi libmrio)
 

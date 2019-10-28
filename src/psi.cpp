@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
         };
         argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
 
-#ifdef LIBMRIO_NETCDF
+#ifdef LIBMRIO_WITH_NETCDF
         if (ends_with(arguments.files[0], ".nc")) {
             table.read_from_netcdf(arguments.files[0], arguments.threshold);
         } else
