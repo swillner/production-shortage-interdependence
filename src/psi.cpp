@@ -22,8 +22,10 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <utility>
 #include "MRIOTable.h"
 #include "nvector.h"
+#include "progressbar.h"
 #include "version.h"
 
 using I = size_t;  // Index type
@@ -155,13 +157,13 @@ int main(int argc, char* argv[]) {
         regions_size = table.index_set().total_regions_count();
 
         T total = 0;
-        nvector<T, 1> in_flow(0, network_size);
-        nvector<T, 1> out_flow(0, network_size);
-        nvector<T, 2> in_flow_by_sector(0, sectors_size, network_size);
-        nvector<T, 1> region_output(0, regions_size);
-        nvector<T, 3> psi(0, arguments.max_psi, network_size, network_size);
-        nvector<bool, 3, std::deque<bool>> paths_traversed_ir_to(false, network_size, sectors_size, network_size);
-        nvector<bool, 3, std::deque<bool>> next_paths_traversed_ir_to(false, network_size, sectors_size, network_size);
+        nvector::Vector<T, 1> in_flow(0, network_size);
+        nvector::Vector<T, 1> out_flow(0, network_size);
+        nvector::Vector<T, 2> in_flow_by_sector(0, sectors_size, network_size);
+        nvector::Vector<T, 1> region_output(0, regions_size);
+        nvector::Vector<T, 3> psi(0, arguments.max_psi, network_size, network_size);
+        nvector::Vector<bool, 3, std::deque<bool>> paths_traversed_ir_to(false, network_size, sectors_size, network_size);
+        nvector::Vector<bool, 3, std::deque<bool>> next_paths_traversed_ir_to(false, network_size, sectors_size, network_size);
 
         for (I ir = 0; ir < network_size; ++ir) {
             I i = get_sector(ir);
@@ -190,9 +192,12 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-        nvector<I, 1> last_max_k(0, network_size);
+        nvector::Vector<I, 1> last_max_k(0, network_size);
+        std::cout << arguments.max_psi << std::endl;
+        std::cout << arguments.max_psi << std::endl;
+        std::cout << arguments.max_psi << std::endl;
+        progressbar::ProgressBar progress(network_size);
         for (I ir = 0; ir < network_size; ++ir) {
-            std::cout << ir << " / " << network_size << std::endl;
             if (ir > 0) {
                 paths_traversed_ir_to.reset(false);
                 next_paths_traversed_ir_to.reset(false);
@@ -242,10 +247,11 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 if (level < arguments.max_psi - 1) {
-                    std::swap(paths_traversed_ir_to, next_paths_traversed_ir_to);
+                    std::swap<nvector::Vector<bool, 3, std::deque<bool>>>(paths_traversed_ir_to, next_paths_traversed_ir_to);
                     next_paths_traversed_ir_to.reset(false);
                 }
             }
+            ++progress;
         }
 
         std::string outfileprefix;
@@ -259,8 +265,8 @@ int main(int argc, char* argv[]) {
             std::ofstream csv_file(outfileprefix + "_regions.csv");
             csv_file << std::setprecision(5) << std::fixed;
 
-            nvector<T, 3> psi_from_region_to_region(0, arguments.max_psi - 1, regions_size, regions_size);
-            nvector<I, 3> max_sector(0, arguments.max_psi - 1, regions_size, regions_size);
+            nvector::Vector<T, 3> psi_from_region_to_region(0, arguments.max_psi - 1, regions_size, regions_size);
+            nvector::Vector<I, 3> max_sector(0, arguments.max_psi - 1, regions_size, regions_size);
             {
                 I r;
 #pragma omp parallel default(shared) private(r)
@@ -333,7 +339,7 @@ int main(int argc, char* argv[]) {
             std::ofstream csv_file(outfileprefix + "_per_region.csv");
             csv_file << std::setprecision(5) << std::fixed;
 
-            nvector<T, 3> psi_from_sector_to_region(0, arguments.max_psi, network_size, regions_size);
+            nvector::Vector<T, 3> psi_from_sector_to_region(0, arguments.max_psi, network_size, regions_size);
             for (I level = 0; level < arguments.max_psi; ++level) {
                 I ir;
 #pragma omp parallel default(shared) private(ir)
@@ -373,7 +379,7 @@ int main(int argc, char* argv[]) {
             std::ofstream csv_file(outfileprefix + "_from.csv");
             csv_file << std::setprecision(5) << std::fixed;
 
-            nvector<T, 2> psi_from(0, arguments.max_psi, network_size);
+            nvector::Vector<T, 2> psi_from(0, arguments.max_psi, network_size);
             for (I level = 0; level < arguments.max_psi; ++level) {
                 I ir;
 #pragma omp parallel default(shared) private(ir)
@@ -407,7 +413,7 @@ int main(int argc, char* argv[]) {
             std::ofstream csv_file(outfileprefix + "_to.csv");
             csv_file << std::setprecision(5) << std::fixed;
 
-            nvector<T, 2> psi_to(0, arguments.max_psi, network_size);
+            nvector::Vector<T, 2> psi_to(0, arguments.max_psi, network_size);
             for (I level = 0; level < arguments.max_psi; ++level) {
                 I ir;
 #pragma omp parallel default(shared) private(ir)
