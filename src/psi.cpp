@@ -39,21 +39,17 @@ static const char* doc =
     "    A Network Measure for Cascading Production Losses.\n"
     "\n"
     "Source: https://github.com/swillner/production-shortage-interdependence";
-static const char* args_doc = "DATAFILE [INDEXFILE] OUTPUTFILE";
+static const char* args_doc = "DATAFILE [INDEXFILE] OUTPUTFILESPREFIX";
 static struct argp_option options[] = {{"threshold", 't', "THRESHOLD", 0, "Only read values > THRESHOLD from table (default: 0)", 0},
                                        {"gamma", 'g', "GAMMA", 0, "Substitutability 'gamma' (default: 0)", 0},
                                        {"max", 'm', "MAX_PSI", 0, "Maximal PSI level to calculate (default: 10)", 0},
-                                       {"output-type", 'o', "OUTPUTTYPE", 0, "What to output (values: full from to per_region regions, default: full)", 0},
                                        {"exclude-self-supply", 's', nullptr, 0, "Do not consider self-supply", 0},
                                        {nullptr, 0, nullptr, 0, nullptr, 0}};
-
-enum class OutputType { FULL, FROM, TO, PER_REGION, REGIONS };
 
 struct Arguments {
     T threshold;
     T gamma;
     I max_psi;
-    OutputType output_type;
     bool self_supply;
     char* files[3];
 };
@@ -76,23 +72,6 @@ static error_t parse_opt(int key, char* arg, struct argp_state* state) {
         case 's':
             args->self_supply = false;
             break;
-
-        case 'o': {
-            std::string output_type(arg);
-            if (output_type == "full") {
-                args->output_type = OutputType::FULL;
-            } else if (output_type == "from") {
-                args->output_type = OutputType::FROM;
-            } else if (output_type == "to") {
-                args->output_type = OutputType::TO;
-            } else if (output_type == "per_region") {
-                args->output_type = OutputType::PER_REGION;
-            } else if (output_type == "regions") {
-                args->output_type = OutputType::REGIONS;
-            } else {
-                argp_usage(state);
-            }
-        } break;
 
         case ARGP_KEY_ARG:
             if (state->arg_num >= 3) {
@@ -135,12 +114,11 @@ int main(int argc, char* argv[]) {
 #endif
         struct argp argp = {options, parse_opt, args_doc, doc, nullptr, nullptr, nullptr};
         struct Arguments arguments = {
-            1000,              // threshold
-            0,                 // gamma
-            11,                // max_psi
-            OutputType::FULL,  // output_type
-            true,              // self_supply
-            nullptr            // files[2]
+            1000,    // threshold
+            0,       // gamma
+            11,      // max_psi
+            true,    // self_supply
+            nullptr  // files[2]
         };
         argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
 
@@ -185,10 +163,10 @@ int main(int argc, char* argv[]) {
         nvector<bool, 3, std::deque<bool>> paths_traversed_ir_to(false, network_size, sectors_size, network_size);
         nvector<bool, 3, std::deque<bool>> next_paths_traversed_ir_to(false, network_size, sectors_size, network_size);
 
-        for (I ir = 0; ir < network_size; ir++) {
+        for (I ir = 0; ir < network_size; ++ir) {
             I i = get_sector(ir);
             I r = get_region(ir);
-            for (I js = 0; js < network_size; js++) {
+            for (I js = 0; js < network_size; ++js) {
                 if (arguments.self_supply || ir != js) {
                     in_flow(ir) += table(js, ir);
                     out_flow(ir) += table(ir, js);
@@ -199,12 +177,12 @@ int main(int argc, char* argv[]) {
             total += out_flow(ir);
         }
 
-        for (I ir = 0; ir < network_size; ir++) {
+        for (I ir = 0; ir < network_size; ++ir) {
             psi(0, ir, ir) = 1;
             I i = get_sector(ir);
-            for (I js = 0; js < network_size; js++) {
+            for (I js = 0; js < network_size; ++js) {
                 if (ir == js) {
-                    for (I level = 1; level < arguments.max_psi; level++) {
+                    for (I level = 1; level < arguments.max_psi; ++level) {
                         psi(level, ir, js) = 1;
                     }
                 } else if (in_flow_by_sector(i, js) > 0) {
@@ -213,25 +191,26 @@ int main(int argc, char* argv[]) {
             }
         }
         nvector<I, 1> last_max_k(0, network_size);
-        for (I ir = 0; ir < network_size; ir++) {
+        for (I ir = 0; ir < network_size; ++ir) {
+            std::cout << ir << " / " << network_size << std::endl;
             if (ir > 0) {
                 paths_traversed_ir_to.reset(false);
                 next_paths_traversed_ir_to.reset(false);
             }
-            for (I js = 0; js < network_size; js++) {
+            for (I js = 0; js < network_size; ++js) {
                 last_max_k(js) = get_sector(js);
             }
-            for (I level = 2; level < arguments.max_psi; level++) {
+            for (I level = 2; level < arguments.max_psi; ++level) {
                 I js;
 #pragma omp parallel default(shared) private(js)
                 {
 #pragma omp for schedule(guided) nowait
-                    for (js = 0; js < network_size; js++) {
+                    for (js = 0; js < network_size; ++js) {
                         if (js != ir) {
                             I max_k = last_max_k(js);
-                            for (I k = 0; k < sectors_size; k++) {
+                            for (I k = 0; k < sectors_size; ++k) {
                                 T new_psi = 0;
-                                for (I u = 0; u < regions_size; u++) {
+                                for (I u = 0; u < regions_size; ++u) {
                                     I ku = get_index(k, u);
                                     if (ku != js) {
                                         if (!paths_traversed_ir_to(ku, k, js) || ku == ir) {
@@ -246,11 +225,11 @@ int main(int argc, char* argv[]) {
                             }
                             if (level < arguments.max_psi - 1) {
                                 next_paths_traversed_ir_to(js, max_k, js) = true;
-                                for (I u = 0; u < regions_size; u++) {
+                                for (I u = 0; u < regions_size; ++u) {
                                     I ku = get_index(max_k, u);
                                     if (psi(level - 1, ir, ku) > 0 && psi(1, ku, js) > 0 && !paths_traversed_ir_to(ku, max_k, js)) {
-                                        for (I l = 0; l < sectors_size; l++) {
-                                            for (I mv = 0; mv < network_size; mv++) {
+                                        for (I l = 0; l < sectors_size; ++l) {
+                                            for (I mv = 0; mv < network_size; ++mv) {
                                                 next_paths_traversed_ir_to(js, l, mv) =
                                                     next_paths_traversed_ir_to(js, l, mv) || paths_traversed_ir_to(ku, l, mv);
                                             }
@@ -269,161 +248,51 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        char* outfile;
+        std::string outfileprefix;
         if (arguments.files[2] != nullptr) {
-            outfile = arguments.files[2];
+            outfileprefix = arguments.files[2];
         } else {
-            outfile = arguments.files[1];
+            outfileprefix = arguments.files[1];
         }
-        std::ofstream csv_file(outfile);
-        csv_file << std::setprecision(5) << std::fixed;
 
-        switch (arguments.output_type) {
-            case OutputType::REGIONS: {
-                nvector<T, 3> psi_from_region_to_region(0, arguments.max_psi - 1, regions_size, regions_size);
-                nvector<I, 3> max_sector(0, arguments.max_psi - 1, regions_size, regions_size);
-                {
-                    I r;
+        {
+            std::ofstream csv_file(outfileprefix + "_regions.csv");
+            csv_file << std::setprecision(5) << std::fixed;
+
+            nvector<T, 3> psi_from_region_to_region(0, arguments.max_psi - 1, regions_size, regions_size);
+            nvector<I, 3> max_sector(0, arguments.max_psi - 1, regions_size, regions_size);
+            {
+                I r;
 #pragma omp parallel default(shared) private(r)
-                    {
+                {
 #pragma omp for schedule(guided) nowait
-                        for (r = 0; r < regions_size; r++) {
-                            for (I s = 0; s < regions_size; s++) {
-                                for (I level = 1; level < arguments.max_psi; level++) {
-                                    for (I j = 0; j < sectors_size; j++) {
-                                        I js = get_index(j, s);
-                                        T max_psi = 0;
-                                        for (I i = 0; i < sectors_size; i++) {
-                                            I ir = get_index(i, r);
-                                            if (psi(level, ir, js) > max_psi) {
-                                                max_sector(level - 1, r, s) = i;
-                                                max_psi = psi(level, ir, js);
-                                            }
-                                        }
-                                        psi_from_region_to_region(level - 1, r, s) += out_flow(js) * max_psi;
-                                    }
-                                    psi_from_region_to_region(level - 1, r, s) /= region_output(s);
-                                }
-                            }
-                        }
-                    }
-                }
-                for (I r = 0; r < regions_size; r++) {
-                    for (I s = 0; s < regions_size; s++) {
-                        csv_file << table.index_set().superregions()[r]->name << ',';
-                        csv_file << table.index_set().superregions()[s]->name << ',';
-                        for (I level = 1; level < arguments.max_psi; level++) {
-                            csv_file << psi_from_region_to_region(level - 1, r, s) << ','
-                                     << table.index_set().supersectors()[max_sector(level - 1, r, s)]->name;
-                            if (level < arguments.max_psi - 1) {
-                                csv_file << ',';
-                            } else {
-                                csv_file << '\n';
-                            }
-                        }
-                    }
-                }
-            } break;
-            case OutputType::FULL: {
-                for (I ir = 0; ir < network_size; ir++) {
-                    for (I js = 0; js < network_size; js++) {
-                        csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
-                        csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
-                        csv_file << table.index_set().supersectors()[get_sector(js)]->name << ',';
-                        csv_file << table.index_set().superregions()[get_region(js)]->name << ',';
-                        for (I level = 1; level < arguments.max_psi; level++) {
-                            csv_file << psi(level, ir, js);
-                            if (level < arguments.max_psi - 1) {
-                                csv_file << ',';
-                            } else {
-                                csv_file << '\n';
-                            }
-                        }
-                    }
-                }
-            } break;
-            case OutputType::PER_REGION: {
-                nvector<T, 3> psi_from_sector_to_region(0, arguments.max_psi, network_size, regions_size);
-                for (I level = 0; level < arguments.max_psi; level++) {
-                    I ir;
-#pragma omp parallel default(shared) private(ir)
-                    {
-#pragma omp for schedule(guided) nowait
-                        for (ir = 0; ir < network_size; ir++) {
-                            for (I s = 0; s < regions_size; s++) {
-                                for (I j = 0; j < sectors_size; j++) {
+                    for (r = 0; r < regions_size; ++r) {
+                        for (I s = 0; s < regions_size; ++s) {
+                            for (I level = 1; level < arguments.max_psi; ++level) {
+                                for (I j = 0; j < sectors_size; ++j) {
                                     I js = get_index(j, s);
-                                    psi_from_sector_to_region(level, ir, s) += out_flow(js) * psi(level, ir, js);
+                                    T max_psi = 0;
+                                    for (I i = 0; i < sectors_size; ++i) {
+                                        I ir = get_index(i, r);
+                                        if (psi(level, ir, js) > max_psi) {
+                                            max_sector(level - 1, r, s) = i;
+                                            max_psi = psi(level, ir, js);
+                                        }
+                                    }
+                                    psi_from_region_to_region(level - 1, r, s) += out_flow(js) * max_psi;
                                 }
-                                psi_from_sector_to_region(level, ir, s) /= region_output(s);
+                                psi_from_region_to_region(level - 1, r, s) /= region_output(s);
                             }
                         }
                     }
                 }
-                for (I ir = 0; ir < network_size; ir++) {
-                    for (I s = 0; s < regions_size; s++) {
-                        csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
-                        csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
-                        csv_file << table.index_set().superregions()[s]->name << ',';
-                        for (I level = 1; level < arguments.max_psi; level++) {
-                            csv_file << psi_from_sector_to_region(level, ir, s);
-                            if (level < arguments.max_psi - 1) {
-                                csv_file << ',';
-                            } else {
-                                csv_file << '\n';
-                            }
-                        }
-                    }
-                }
-            } break;
-            case OutputType::FROM: {
-                nvector<T, 2> psi_from(0, arguments.max_psi, network_size);
-                for (I level = 0; level < arguments.max_psi; level++) {
-                    I ir;
-#pragma omp parallel default(shared) private(ir)
-                    {
-#pragma omp for schedule(guided) nowait
-                        for (ir = 0; ir < network_size; ir++) {
-                            for (I js = 0; js < network_size; js++) {
-                                psi_from(level, ir) += out_flow(js) * psi(level, ir, js);
-                            }
-                            psi_from(level, ir) /= total;
-                        }
-                    }
-                }
-                for (I ir = 0; ir < network_size; ir++) {
-                    csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
-                    csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
-                    for (I level = 1; level < arguments.max_psi; level++) {
-                        csv_file << psi_from(level, ir);
-                        if (level < arguments.max_psi - 1) {
-                            csv_file << ',';
-                        } else {
-                            csv_file << '\n';
-                        }
-                    }
-                }
-            } break;
-            case OutputType::TO: {
-                nvector<T, 2> psi_to(0, arguments.max_psi, network_size);
-                for (I level = 0; level < arguments.max_psi; level++) {
-                    I ir;
-#pragma omp parallel default(shared) private(ir)
-                    {
-#pragma omp for schedule(guided) nowait
-                        for (ir = 0; ir < network_size; ir++) {
-                            for (I js = 0; js < network_size; js++) {
-                                psi_to(level, ir) += out_flow(ir) * psi(level, js, ir);
-                            }
-                            psi_to(level, ir) /= total;
-                        }
-                    }
-                }
-                for (I ir = 0; ir < network_size; ir++) {
-                    csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
-                    csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
-                    for (I level = 1; level < arguments.max_psi; level++) {
-                        csv_file << psi_to(level, ir);
+            }
+            for (I r = 0; r < regions_size; ++r) {
+                for (I s = 0; s < regions_size; ++s) {
+                    csv_file << table.index_set().superregions()[r]->name << ',';
+                    csv_file << table.index_set().superregions()[s]->name << ',';
+                    for (I level = 1; level < arguments.max_psi; ++level) {
+                        csv_file << psi_from_region_to_region(level - 1, r, s) << ',' << table.index_set().supersectors()[max_sector(level - 1, r, s)]->name;
                         if (level < arguments.max_psi - 1) {
                             csv_file << ',';
                         } else {
@@ -432,8 +301,141 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
+
+            csv_file.close();
         }
-        csv_file.close();
+
+        {
+            std::ofstream csv_file(outfileprefix + "_full.csv");
+            csv_file << std::setprecision(5) << std::fixed;
+
+            for (I ir = 0; ir < network_size; ++ir) {
+                for (I js = 0; js < network_size; ++js) {
+                    csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
+                    csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
+                    csv_file << table.index_set().supersectors()[get_sector(js)]->name << ',';
+                    csv_file << table.index_set().superregions()[get_region(js)]->name << ',';
+                    for (I level = 1; level < arguments.max_psi; ++level) {
+                        csv_file << psi(level, ir, js);
+                        if (level < arguments.max_psi - 1) {
+                            csv_file << ',';
+                        } else {
+                            csv_file << '\n';
+                        }
+                    }
+                }
+            }
+
+            csv_file.close();
+        }
+
+        {
+            std::ofstream csv_file(outfileprefix + "_per_region.csv");
+            csv_file << std::setprecision(5) << std::fixed;
+
+            nvector<T, 3> psi_from_sector_to_region(0, arguments.max_psi, network_size, regions_size);
+            for (I level = 0; level < arguments.max_psi; ++level) {
+                I ir;
+#pragma omp parallel default(shared) private(ir)
+                {
+#pragma omp for schedule(guided) nowait
+                    for (ir = 0; ir < network_size; ++ir) {
+                        for (I s = 0; s < regions_size; ++s) {
+                            for (I j = 0; j < sectors_size; ++j) {
+                                I js = get_index(j, s);
+                                psi_from_sector_to_region(level, ir, s) += out_flow(js) * psi(level, ir, js);
+                            }
+                            psi_from_sector_to_region(level, ir, s) /= region_output(s);
+                        }
+                    }
+                }
+            }
+            for (I ir = 0; ir < network_size; ++ir) {
+                for (I s = 0; s < regions_size; ++s) {
+                    csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
+                    csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
+                    csv_file << table.index_set().superregions()[s]->name << ',';
+                    for (I level = 1; level < arguments.max_psi; ++level) {
+                        csv_file << psi_from_sector_to_region(level, ir, s);
+                        if (level < arguments.max_psi - 1) {
+                            csv_file << ',';
+                        } else {
+                            csv_file << '\n';
+                        }
+                    }
+                }
+            }
+
+            csv_file.close();
+        }
+
+        {
+            std::ofstream csv_file(outfileprefix + "_from.csv");
+            csv_file << std::setprecision(5) << std::fixed;
+
+            nvector<T, 2> psi_from(0, arguments.max_psi, network_size);
+            for (I level = 0; level < arguments.max_psi; ++level) {
+                I ir;
+#pragma omp parallel default(shared) private(ir)
+                {
+#pragma omp for schedule(guided) nowait
+                    for (ir = 0; ir < network_size; ++ir) {
+                        for (I js = 0; js < network_size; ++js) {
+                            psi_from(level, ir) += out_flow(js) * psi(level, ir, js);
+                        }
+                        psi_from(level, ir) /= total;
+                    }
+                }
+            }
+            for (I ir = 0; ir < network_size; ++ir) {
+                csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
+                csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
+                for (I level = 1; level < arguments.max_psi; ++level) {
+                    csv_file << psi_from(level, ir);
+                    if (level < arguments.max_psi - 1) {
+                        csv_file << ',';
+                    } else {
+                        csv_file << '\n';
+                    }
+                }
+            }
+
+            csv_file.close();
+        }
+
+        {
+            std::ofstream csv_file(outfileprefix + "_to.csv");
+            csv_file << std::setprecision(5) << std::fixed;
+
+            nvector<T, 2> psi_to(0, arguments.max_psi, network_size);
+            for (I level = 0; level < arguments.max_psi; ++level) {
+                I ir;
+#pragma omp parallel default(shared) private(ir)
+                {
+#pragma omp for schedule(guided) nowait
+                    for (ir = 0; ir < network_size; ++ir) {
+                        for (I js = 0; js < network_size; ++js) {
+                            psi_to(level, ir) += out_flow(ir) * psi(level, js, ir);
+                        }
+                        psi_to(level, ir) /= total;
+                    }
+                }
+            }
+            for (I ir = 0; ir < network_size; ++ir) {
+                csv_file << table.index_set().supersectors()[get_sector(ir)]->name << ',';
+                csv_file << table.index_set().superregions()[get_region(ir)]->name << ',';
+                for (I level = 1; level < arguments.max_psi; ++level) {
+                    csv_file << psi_to(level, ir);
+                    if (level < arguments.max_psi - 1) {
+                        csv_file << ',';
+                    } else {
+                        csv_file << '\n';
+                    }
+                }
+            }
+
+            csv_file.close();
+        }
 
         return 0;
 
